@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>FFXIV Arrow Trainer (by Aleenz)</title>
+<style>
+body{
+    background:#111;
+    color:white;
+    font-family:Arial,sans-serif;
+    text-align:center;
+}
+
+#currentSet{
+    font-size:64px;
+    margin:15px;
+}
+
+.arena{
+    width:700px;
+    height:700px;
+    margin:20px auto;
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    grid-template-rows:1fr 1fr 1fr;
+    gap:10px;
+}
+
+.spot{
+    border:4px solid #00bfff;
+    border-radius:20px;
+    background:#1a1a1a;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.vertical{
+    flex-direction:column;
+}
+
+.horizontal{
+    flex-direction:row;
+}
+
+.center{
+    background:transparent;
+    border:none;
+}
+
+.slot{
+    width:80px;
+    height:80px;
+    margin:8px;
+    border:2px dashed #888;
+    border-radius:10px;
+    font-size:48px;
+    line-height:80px;
+    cursor:pointer;
+    user-select:none;
+}
+
+.arrow-btn{
+    font-size:50px;
+    margin:10px;
+    padding:10px 25px;
+    cursor:pointer;
+}
+
+.selected{
+    outline:4px solid cyan;
+}
+
+.correct{
+    background:#145c2e;
+}
+
+.wrong{
+    background:#5c1414;
+}
+</style>
+</head>
+<body>
+
+<h1>FFXIV Arrow Trainer (by Aleenz)</h1>
+
+<div id="currentSet"></div>
+
+<button id="arrow0" class="arrow-btn" onclick="selectArrow(0)"></button>
+<button id="arrow1" class="arrow-btn" onclick="selectArrow(1)"></button>
+
+<br><br>
+
+<button onclick="checkAnswer()">Check</button>
+<button onclick="newSet()">New Set</button>
+
+<h2 id="result"></h2>
+
+<div class="arena">
+  <div class="spot" data-spot="0"></div>
+  <div class="spot" data-spot="1"></div>
+  <div class="spot" data-spot="2"></div>
+
+  <div class="spot" data-spot="7"></div>
+  <div class="center"></div>
+  <div class="spot" data-spot="3"></div>
+
+  <div class="spot" data-spot="6"></div>
+  <div class="spot" data-spot="5"></div>
+  <div class="spot" data-spot="4"></div>
+</div>
+
+<script>
+
+const arrows = ["↑","↓","←","→"];
+
+const opposites = {
+  "↑":"↓",
+  "↓":"↑",
+  "←":"→",
+  "→":"←"
+};
+
+const solutionMap = {
+  "↑↑": 7,
+  "↓↓": 3,
+  "←←": 5,
+  "→→": 1,
+
+  "↑←": 6,
+  "←↑": 6,
+
+  "↑→": 0,
+  "→↑": 0,
+
+  "↓←": 4,
+  "←↓": 4,
+
+  "↓→": 2,
+  "→↓": 2
+};
+
+// Correct arrow order inside each spot, matching the diagram.
+// For vertical spots, slot 0 is top and slot 1 is bottom.
+// For horizontal spots, slot 0 is left and slot 1 is right.
+const spotArrowOrder = {
+  0: ["→", "↑"],
+  1: ["→", "→"],
+  2: ["→", "↓"],
+  3: ["↓", "↓"],
+  4: ["↓", "←"],
+  5: ["←", "←"],
+  6: ["↑", "←"],
+  7: ["↑", "↑"]
+};
+
+let currentPair = [];
+let selectedArrow = null;
+let placed = {};
+
+function setupSlots() {
+  document.querySelectorAll(".spot").forEach(spot => {
+
+    const n = Number(spot.dataset.spot);
+
+    spot.classList.remove("vertical","horizontal");
+
+    if ([0,3,4,7].includes(n))
+      spot.classList.add("vertical");
+    else
+      spot.classList.add("horizontal");
+
+    spot.innerHTML = `
+      <div class="slot" onclick="placeArrow(this,0)"></div>
+      <div class="slot" onclick="placeArrow(this,1)"></div>
+    `;
+  });
+}
+
+function generatePair() {
+  const first = arrows[Math.floor(Math.random()*4)];
+  const valid = arrows.filter(a => a !== opposites[first]);
+  const second = valid[Math.floor(Math.random()*valid.length)];
+  return [first, second];
+}
+
+function newSet() {
+
+  currentPair = generatePair();
+  placed = {};
+  selectedArrow = null;
+
+  document.getElementById("currentSet").innerText =
+      currentPair[0] + " " + currentPair[1];
+
+  document.getElementById("arrow0").innerText = currentPair[0];
+  document.getElementById("arrow1").innerText = currentPair[1];
+
+  document.getElementById("arrow0").disabled = false;
+  document.getElementById("arrow1").disabled = false;
+
+  document.getElementById("arrow0").classList.remove("selected");
+  document.getElementById("arrow1").classList.remove("selected");
+
+  document.getElementById("result").innerText = "";
+
+  setupSlots();
+}
+
+function selectArrow(i) {
+
+  selectedArrow = i;
+
+  document.getElementById("arrow0").classList.remove("selected");
+  document.getElementById("arrow1").classList.remove("selected");
+
+  document.getElementById("arrow"+i).classList.add("selected");
+}
+
+function placeArrow(slot, slotIndex) {
+
+  if(selectedArrow === null) return;
+
+  // If another arrow was already placed in this slot, re-enable that arrow button.
+  if(slot.dataset.arrowIndex !== undefined){
+    const oldIndex = Number(slot.dataset.arrowIndex);
+    document.getElementById("arrow"+oldIndex).disabled = false;
+    delete placed[oldIndex];
+  }
+
+  slot.innerText = currentPair[selectedArrow];
+  slot.dataset.arrowIndex = selectedArrow;
+
+  placed[selectedArrow] = {
+    spot:Number(slot.parentElement.dataset.spot),
+    slot:slotIndex,
+    arrow:currentPair[selectedArrow]
+  };
+
+  document.getElementById("arrow"+selectedArrow).disabled = true;
+  document.getElementById("arrow"+selectedArrow).classList.remove("selected");
+
+  selectedArrow = null;
+}
+
+function getSlotValue(spotNumber, slotIndex){
+  const slot = document.querySelector(`[data-spot="${spotNumber}"] .slot:nth-child(${slotIndex + 1})`);
+  return slot ? slot.innerText : "";
+}
+
+function checkAnswer() {
+
+  const key = currentPair.join("");
+  const correctSpot = solutionMap[key];
+  const expected = spotArrowOrder[correctSpot];
+
+  const actual0 = getSlotValue(correctSpot, 0);
+  const actual1 = getSlotValue(correctSpot, 1);
+
+  const correct =
+      actual0 === expected[0] &&
+      actual1 === expected[1];
+
+  document.querySelectorAll(".slot").forEach(s=>{
+      s.classList.remove("correct","wrong");
+  });
+
+  if(correct){
+      document.getElementById("result").innerText = "Correct!";
+      document.querySelectorAll(`[data-spot="${correctSpot}"] .slot`)
+      .forEach(s=>s.classList.add("correct"));
+  }
+  else{
+      document.getElementById("result").innerText =
+        "Wrong! Correct order: " + expected[0] + " then " + expected[1];
+
+      document.querySelectorAll(".slot").forEach(s=>{
+          if(s.innerText) s.classList.add("wrong");
+      });
+
+      document.querySelectorAll(`[data-spot="${correctSpot}"] .slot`)
+      .forEach((s, i)=>{
+          s.classList.add("correct");
+          if(!s.innerText) s.innerText = expected[i];
+      });
+  }
+}
+
+newSet();
+
+</script>
+
+</body>
+</html>
